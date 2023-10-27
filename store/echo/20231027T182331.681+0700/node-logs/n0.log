@@ -1,0 +1,4 @@
+Error: STDIN cannot be deserialized
+
+Caused by:
+    missing field `echo` at line 1 column 97
