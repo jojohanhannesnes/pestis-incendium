@@ -1,6 +1,7 @@
 use anyhow::{bail, Context};
 use serde::{Deserialize, Serialize};
 use std::io::{stdin, stdout, StdoutLock, Write};
+use ulid::Ulid;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct Message {
@@ -34,6 +35,11 @@ enum Payload {
         node_ids: Vec<String>,
     },
     InitOk,
+    Generate,
+    GenerateOk {
+        #[serde(rename = "id")]
+        guid: String,
+    },
 }
 
 struct EchoNode {
@@ -44,20 +50,6 @@ impl EchoNode {
     pub fn step(&mut self, input: Message, output: &mut StdoutLock) -> anyhow::Result<()> {
         // println!("{:?}", input);
         match input.body.payload {
-            Payload::Init { .. } => {
-                let reply = Message {
-                    src: input.dst,
-                    dst: input.src,
-                    body: Body {
-                        id: Some(self.id),
-                        in_reply_to: input.body.id,
-                        payload: Payload::InitOk,
-                    },
-                };
-                serde_json::to_writer(&mut *output, &reply).context("serialize response")?;
-                output.write_all(b"\n").context("asd")?;
-                self.id += 1;
-            }
             Payload::Echo { echo } => {
                 let reply = Message {
                     src: input.dst,
@@ -73,7 +65,38 @@ impl EchoNode {
                 self.id += 1;
             }
             Payload::EchoOk { .. } => {}
-            Payload::InitOk { .. } => bail!("shit"),
+            Payload::Init { .. } => {
+                let reply = Message {
+                    src: input.dst,
+                    dst: input.src,
+                    body: Body {
+                        id: Some(self.id),
+                        in_reply_to: input.body.id,
+                        payload: Payload::InitOk,
+                    },
+                };
+                serde_json::to_writer(&mut *output, &reply).context("serialize response")?;
+                output.write_all(b"\n").context("asd")?;
+                self.id += 1;
+            }
+            Payload::InitOk { .. } => bail!("not expecting init_ok from other peers"),
+            Payload::Generate { .. } => {
+                let reply = Message {
+                    src: input.dst,
+                    dst: input.src,
+                    body: Body {
+                        id: Some(self.id),
+                        in_reply_to: input.body.id,
+                        payload: Payload::GenerateOk {
+                            guid: Ulid::new().to_string(),
+                        },
+                    },
+                };
+                serde_json::to_writer(&mut *output, &reply).context("serialize response")?;
+                output.write_all(b"\n").context("write trailing newline")?;
+                self.id += 1;
+            }
+            Payload::GenerateOk { .. } => bail!("not expecting generate_ok from other peers"),
         }
 
         Ok(())
