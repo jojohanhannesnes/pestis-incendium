@@ -5,5 +5,9 @@ echo: build
 
 unique-id: build
 	maelstrom test -w unique-ids --bin ${target} --time-limit 30 --rate 1000 --node-count 3 --availability total --nemesis partition
+
+broadcast: build
+	maelstrom test -w broadcast --bin ${target} --node-count 1 --time-limit 20 --rate 10
+
 build: 
 	cargo b
